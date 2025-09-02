@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>客服数据大屏导航</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -124,71 +125,96 @@
             line-height: 1.6;
         }
         
-        .dashboard-content {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
-        }
-        
-        .dashboard-card {
+        /* 新增部分样式 */
+        .section {
             background-color: #1a2332;
             border-radius: 8px;
             padding: 25px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            transition: transform 0.3s;
-            height: 200px;
-            display: flex;
-            flex-direction: column;
+            margin-bottom: 30px;
         }
         
-        .dashboard-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-        }
-        
-        .card-header {
+        .section-title {
+            font-size: 20px;
+            color: #aab2c0;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
             margin-bottom: 20px;
         }
         
-        .card-title {
-            font-size: 20px;
-            color: #aab2c0;
-        }
-        
-        .card-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
+        .filter-btn {
+            padding: 8px 16px;
             background-color: #2a3346;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: #409EFF;
+            color: #aab2c0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
         }
         
-        .card-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+        .filter-btn.active {
+            background-color: #409EFF;
+            color: white;
         }
         
-        .card-value {
+        .filter-btn:hover:not(.active) {
+            background-color: #222b3c;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .metric-card {
+            background-color: #222b3c;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .metric-title {
+            font-size: 16px;
+            color: #aab2c0;
+            margin-bottom: 15px;
+        }
+        
+        .metric-value {
             font-size: 32px;
             font-weight: bold;
             color: #409EFF;
             margin: 10px 0;
         }
         
-        .card-change {
-            font-size: 14px;
+        .metric-change {
             display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        
+        .change-item {
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 5px;
+        }
+        
+        .change-label {
+            font-size: 12px;
+            color: #aab2c0;
+            margin-bottom: 5px;
+        }
+        
+        .change-value {
+            font-size: 14px;
+            font-weight: bold;
         }
         
         .positive {
@@ -197,6 +223,51 @@
         
         .negative {
             color: #f56c6c;
+        }
+        
+        .chart-container {
+            height: 250px;
+            margin-top: 20px;
+        }
+        
+        .ranking-list {
+            margin-top: 20px;
+        }
+        
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background-color: #222b3c;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+        
+        .ranking-name {
+            flex: 1;
+        }
+        
+        .ranking-bar {
+            flex: 2;
+            height: 20px;
+            background-color: #2a3346;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 0 15px;
+            position: relative;
+        }
+        
+        .ranking-fill {
+            height: 100%;
+            background-color: #409EFF;
+            border-radius: 10px;
+        }
+        
+        .ranking-value {
+            flex: 0.5;
+            text-align: right;
+            color: #409EFF;
+            font-weight: bold;
         }
         
         .stats-grid {
@@ -244,7 +315,11 @@
         
         /* 响应式设计 */
         @media (max-width: 1200px) {
-            .dashboard-content {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -276,10 +351,6 @@
             .nav-item.active {
                 border-left-color: transparent;
                 border-bottom-color: #409EFF;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -342,75 +413,121 @@
             </div>
         </div>
         
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-label">今日客诉量</div>
-                <div class="stat-value">42</div>
-                <div class="card-change negative">↑8% 较昨日</div>
+        <!-- 第一部分：关键指标展示 -->
+        <div class="section">
+            <h2 class="section-title">关键指标</h2>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="overall">整体</button>
+                <button class="filter-btn" data-filter="presale">售前</button>
+                <button class="filter-btn" data-filter="aftersale">售后</button>
             </div>
-            <div class="stat-box">
-                <div class="stat-label">平均满意度</div>
-                <div class="stat-value">92.6%</div>
-                <div class="card-change positive">↑2.3% 较上周</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">平均接听率</div>
-                <div class="stat-value">88.4%</div>
-                <div class="card-change negative">↓1.5% 较上周</div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">总客诉量</div>
+                    <div class="metric-value" id="complaint-value">42</div>
+                    <div class="metric-change">
+                        <div class="change-item">
+                            <span class="change-label">较昨日</span>
+                            <span class="change-value negative" id="complaint-day">+8%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上周</span>
+                            <span class="change-value negative" id="complaint-week">+5%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上月</span>
+                            <span class="change-value positive" id="complaint-month">-3%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">超期率</div>
+                    <div class="metric-value" id="overdue-value">12.8%</div>
+                    <div class="metric-change">
+                        <div class="change-item">
+                            <span class="change-label">较昨日</span>
+                            <span class="change-value negative" id="overdue-day">+2.3%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上周</span>
+                            <span class="change-value positive" id="overdue-week">-1.5%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上月</span>
+                            <span class="change-value positive" id="overdue-month">-4.2%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">满意度</div>
+                    <div class="metric-value" id="satisfaction-value">92.6%</div>
+                    <div class="metric-change">
+                        <div class="change-item">
+                            <span class="change-label">较昨日</span>
+                            <span class="change-value positive" id="satisfaction-day">+1.2%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上周</span>
+                            <span class="change-value positive" id="satisfaction-week">+2.3%</span>
+                        </div>
+                        <div class="change-item">
+                            <span class="change-label">较上月</span>
+                            <span class="change-value positive" id="satisfaction-month">+3.8%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="dashboard-content">
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2 class="card-title">客诉量监控</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <div class="card-value">42</div>
-                    <div class="card-change negative">↑8% 较昨日</div>
-                </div>
+        <!-- 第二部分：问题TOP3 -->
+        <div class="section">
+            <h2 class="section-title">问题TOP3分布</h2>
+            <div class="chart-container">
+                <canvas id="problemChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- 第三部分：超期率 -->
+        <div class="section">
+            <h2 class="section-title">超期率分析</h2>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-period="24h">24h</button>
+                <button class="filter-btn" data-period="48h">48h</button>
             </div>
             
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2 class="card-title">满意度</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-smile"></i>
-                    </div>
+            <div class="ranking-list">
+                <div class="ranking-item">
+                    <div class="ranking-name">昨日最高</div>
+                    <div class="ranking-text">品牌部 - 电话渠道 - 美国 - A组</div>
+                    <div class="ranking-value">18.2%</div>
                 </div>
-                <div class="card-content">
-                    <div class="card-value">92.6%</div>
-                    <div class="card-change positive">↑2.3% 较上周</div>
+                <div class="ranking-item">
+                    <div class="ranking-name">本周最高</div>
+                    <div class="ranking-text">贸易部 - 邮件渠道 - 欧洲 - C组</div>
+                    <div class="ranking-value">15.7%</div>
                 </div>
-            </div>
-            
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2 class="card-title">质检通过率</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <div class="card-value">95.2%</div>
-                    <div class="card-change positive">↑1.8% 较上周</div>
+                <div class="ranking-item">
+                    <div class="ranking-name">本月最高</div>
+                    <div class="ranking-text">品牌部 - 消息渠道 - 亚洲 - B组</div>
+                    <div class="ranking-value">22.4%</div>
                 </div>
             </div>
+        </div>
+        
+        <!-- 第四部分：审核时效 -->
+        <div class="section">
+            <h2 class="section-title">审核时效分析</h2>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-audit="24h">24h</button>
+                <button class="filter-btn" data-audit="48h">48h</button>
+                <button class="filter-btn" data-audit="72h">72h</button>
+            </div>
             
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2 class="card-title">接听率</h2>
-                    <div class="card-icon">
-                        <i class="fas fa-phone"></i>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <div class="card-value">88.4%</div>
-                    <div class="card-change negative">↓1.5% 较上周</div>
-                </div>
+            <div class="chart-container">
+                <canvas id="auditChart"></canvas>
             </div>
         </div>
         
@@ -440,6 +557,289 @@
                 }
             });
         });
+        
+        // 筛选按钮事件
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const parent = this.parentElement;
+                
+                // 如果是数据筛选按钮
+                if (this.dataset.filter) {
+                    parent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    updateMetrics(this.dataset.filter);
+                }
+                // 如果是超期率时间筛选
+                else if (this.dataset.period) {
+                    parent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    updateOverdueRate(this.dataset.period);
+                }
+                // 如果是审核时效筛选
+                else if (this.dataset.audit) {
+                    parent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    updateAuditChart(this.dataset.audit);
+                }
+            });
+        });
+        
+        // 更新指标数据
+        function updateMetrics(filter) {
+            // 模拟不同筛选条件下的数据
+            const data = {
+                overall: {
+                    complaint: { value: 42, day: '+8%', week: '+5%', month: '-3%' },
+                    overdue: { value: '12.8%', day: '+2.3%', week: '-1.5%', month: '-4.2%' },
+                    satisfaction: { value: '92.6%', day: '+1.2%', week: '+2.3%', month: '+3.8%' }
+                },
+                presale: {
+                    complaint: { value: 18, day: '+3%', week: '+2%', month: '-1%' },
+                    overdue: { value: '8.2%', day: '+1.1%', week: '-0.8%', month: '-2.5%' },
+                    satisfaction: { value: '95.2%', day: '+0.8%', week: '+1.5%', month: '+2.2%' }
+                },
+                aftersale: {
+                    complaint: { value: 24, day: '+5%', week: '+3%', month: '-2%' },
+                    overdue: { value: '16.5%', day: '+3.2%', week: '-0.7%', month: '-3.1%' },
+                    satisfaction: { value: '89.3%', day: '+1.5%', week: '+2.8%', month: '+4.1%' }
+                }
+            };
+            
+            const selectedData = data[filter];
+            
+            // 更新客诉量数据
+            document.getElementById('complaint-value').textContent = selectedData.complaint.value;
+            document.getElementById('complaint-day').textContent = selectedData.complaint.day;
+            document.getElementById('complaint-week').textContent = selectedData.complaint.week;
+            document.getElementById('complaint-month').textContent = selectedData.complaint.month;
+            
+            // 更新超期率数据
+            document.getElementById('overdue-value').textContent = selectedData.overdue.value;
+            document.getElementById('overdue-day').textContent = selectedData.overdue.day;
+            document.getElementById('overdue-week').textContent = selectedData.overdue.week;
+            document.getElementById('overdue-month').textContent = selectedData.overdue.month;
+            
+            // 更新满意度数据
+            document.getElementById('satisfaction-value').textContent = selectedData.satisfaction.value;
+            document.getElementById('satisfaction-day').textContent = selectedData.satisfaction.day;
+            document.getElementById('satisfaction-week').textContent = selectedData.satisfaction.week;
+            document.getElementById('satisfaction-month').textContent = selectedData.satisfaction.month;
+            
+            // 更新颜色
+            updateChangeColors('complaint');
+            updateChangeColors('overdue');
+            updateChangeColors('satisfaction');
+        }
+        
+        // 更新变化值颜色
+        function updateChangeColors(metric) {
+            ['day', 'week', 'month'].forEach(period => {
+                const element = document.getElementById(`${metric}-${period}`);
+                if (element.textContent.includes('+')) {
+                    element.className = 'change-value negative';
+                } else {
+                    element.className = 'change-value positive';
+                }
+            });
+        }
+        
+        // 更新超期率数据
+        function updateOverdueRate(period) {
+            // 这里可以根据不同的period更新超期率数据
+            console.log(`更新超期率数据: ${period}`);
+        }
+        
+        // 初始化图表
+        function initCharts() {
+            // 问题TOP3图表
+            const problemCtx = document.getElementById('problemChart').getContext('2d');
+            window.problemChart = new Chart(problemCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['产品质量问题', '物流延迟问题', '售后服务问题'],
+                    datasets: [{
+                        label: '问题占比',
+                        data: [42, 35, 23],
+                        backgroundColor: ['#409EFF', '#67C23A', '#E6A23C'],
+                        borderWidth: 0,
+                        borderRadius: 5,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 50,
+                            grid: {
+                                color: '#2a3346'
+                            },
+                            ticks: {
+                                color: '#aab2c0'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: '#2a3346'
+                            },
+                            ticks: {
+                                color: '#aab2c0'
+                            }
+                        }
+                    },
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // 审核时效图表
+            const auditCtx = document.getElementById('auditChart').getContext('2d');
+            window.auditChart = new Chart(auditCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [
+                        {
+                            label: '退货审核',
+                            data: [75, 78, 82, 85, 83, 88],
+                            borderColor: '#409EFF',
+                            backgroundColor: 'rgba(64, 158, 255, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: '调整审核',
+                            data: [82, 85, 79, 88, 90, 92],
+                            borderColor: '#67C23A',
+                            backgroundColor: 'rgba(103, 194, 58, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: '退款审核',
+                            data: [88, 92, 90, 93, 91, 95],
+                            borderColor: '#E6A23C',
+                            backgroundColor: 'rgba(230, 162, 60, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: '补货审核',
+                            data: [70, 75, 78, 82, 85, 89],
+                            borderColor: '#F56C6C',
+                            backgroundColor: 'rgba(245, 108, 108, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#aab2c0'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: '#2a3346'
+                            },
+                            ticks: {
+                                color: '#aab2c0'
+                            }
+                        },
+                        y: {
+                            min: 60,
+                            max: 100,
+                            grid: {
+                                color: '#2a3346'
+                            },
+                            ticks: {
+                                color: '#aab2c0'
+                            }
+                        }
+                    },
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // 添加基线
+            addBaseline(window.auditChart, 80, '24h基线', '#909399');
+            addBaseline(window.auditChart, 90, '48h基线', '#909399');
+        }
+        
+        // 添加基线
+        function addBaseline(chart, value, label, color) {
+            chart.data.datasets.push({
+                label: label,
+                data: Array(chart.data.labels.length).fill(value),
+                borderColor: color,
+                borderWidth: 1,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                tension: 0
+            });
+            chart.update();
+        }
+        
+        // 更新审核时效图表
+        function updateAuditChart(period) {
+            // 根据不同的时间段更新图表数据
+            const newData = {
+                '24h': {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [
+                        { data: [75, 78, 82, 85, 83, 88] },
+                        { data: [82, 85, 79, 88, 90, 92] },
+                        { data: [88, 92, 90, 93, 91, 95] },
+                        { data: [70, 75, 78, 82, 85, 89] }
+                    ]
+                },
+                '48h': {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [
+                        { data: [85, 88, 90, 92, 91, 94] },
+                        { data: [90, 92, 88, 94, 95, 97] },
+                        { data: [93, 95, 94, 96, 95, 98] },
+                        { data: [82, 85, 88, 90, 92, 95] }
+                    ]
+                },
+                '72h': {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [
+                        { data: [92, 94, 95, 96, 95, 98] },
+                        { data: [95, 96, 94, 97, 98, 99] },
+                        { data: [96, 97, 96, 98, 97, 99] },
+                        { data: [90, 92, 94, 95, 96, 98] }
+                    ]
+                }
+            };
+            
+            const data = newData[period];
+            
+            window.auditChart.data.labels = data.labels;
+            for (let i = 0; i < 4; i++) {
+                window.auditChart.data.datasets[i].data = data.datasets[i].data;
+            }
+            
+            // 更新基线
+            window.auditChart.data.datasets[4].data = Array(data.labels.length).fill(80);
+            window.auditChart.data.datasets[5].data = Array(data.labels.length).fill(90);
+            
+            window.auditChart.update();
+        }
         
         // 模拟数据更新
         function updateStats() {
@@ -471,8 +871,14 @@
             });
         }
         
-        // 每30秒更新一次数据
-        setInterval(updateStats, 30000);
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateMetrics('overall');
+            
+            // 每30秒更新一次数据
+            setInterval(updateStats, 30000);
+        });
     </script>
 </body>
 </html>
